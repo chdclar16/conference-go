@@ -55,3 +55,16 @@ class Presentation(models.Model):
 
     class Meta:
         ordering = ("title",)  # Default ordering for presentation
+
+    def approve(self):
+        #Gets status instance with name APPROVED
+        status = Status.objects.get(name="APPROVED")
+        # Sets status property on presentation
+        self.status = status
+        # Saves the changes
+        self.save()
+
+    def reject(self):
+        status = Status.objects.get(name="REJECTED")
+        self.status = status
+        self.save()

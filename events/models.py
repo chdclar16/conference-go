@@ -32,6 +32,9 @@ class Location(models.Model):
     room_count = models.PositiveSmallIntegerField()
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+    picture_url = models.URLField(null=True)
+    temp = models.FloatField(null=True)
+    weather = models.CharField(max_length=200, null=True)
 
     state = models.ForeignKey(
         State,
