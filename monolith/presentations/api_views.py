@@ -5,6 +5,7 @@ from events.models import Conference
 from events.api_views import ConferenceListEncoder
 from django.views.decorators.http import require_http_methods
 import json
+import pika
 
 
 class StatusEncoder(ModelEncoder):
@@ -87,8 +88,14 @@ class PresentationDetailEncoder(ModelEncoder):
         "title",
         "synopsis",
         "created",
+        "conference",
     ]
+    encoders = {
+        "conference": ConferenceListEncoder(),
+    }
 
+    def get_extra_data(self, o):
+        return {"status": o.status.name}
 
 @require_http_methods(["GET", "DELETE", "PUT"])
 def api_show_presentation(request, id):
@@ -139,3 +146,57 @@ def api_show_presentation(request, id):
         return JsonResponse(
             presentations, PresentationDetailEncoder, safe=False
         )
+
+
+@require_http_methods(["PUT"])
+def api_approve_presentation(request, id):
+    presentation = Presentation.objects.get(id=id)
+    presentation.approve()
+    new_dict = {
+        "presenter_name": presentation.presenter_name,
+        "presenter_email": presentation.presenter_email,
+        "title": presentation.title,
+    }
+    message = json.dumps(new_dict)
+
+    parameters = pika.ConnectionParameters(host="rabbitmq")
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+    channel.queue_declare(queue="presentation_approvals")
+    channel.basic_publish(
+        exchange="",
+        routing_key="presentation_approvals",
+        body=message,
+    )
+    return JsonResponse(
+        presentation,
+        encoder=PresentationDetailEncoder,
+        safe=False,
+    )
+
+
+@require_http_methods(["PUT"])
+def api_reject_presentation(request, id):
+    presentation = Presentation.objects.get(id=id)
+    presentation.reject()
+    new_dict = {
+        "presenter_name": presentation.presenter_name,
+        "presenter_email": presentation.presenter_email,
+        "title": presentation.title,
+    }
+    message = json.dumps(new_dict)
+
+    parameters = pika.ConnectionParameters(host="rabbitmq")
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+    channel.queue_declare(queue="presentation_rejections")
+    channel.basic_publish(
+        exchange="",
+        routing_key="presentation_rejections",
+        body=message,
+    )
+    return JsonResponse(
+        presentation,
+        encoder=PresentationDetailEncoder,
+        safe=False,
+    )
